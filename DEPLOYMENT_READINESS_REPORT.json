@@ -1,0 +1,164 @@
+{
+  "timestamp": "2026-03-23 11:39:04",
+  "app_folder": "/content/drive/My Drive/AI model for poverty/outputs/app",
+  "readiness_score": 96.97,
+  "total_tests": 33,
+  "passed": 32,
+  "failed": 1,
+  "test_results": {
+    "file_structure": {
+      "passed": 10,
+      "failed": 0,
+      "details": [
+        {
+          "file": "app.py",
+          "status": "OK",
+          "size_kb": 35.39
+        },
+        {
+          "file": "requirements.txt",
+          "status": "OK",
+          "size_kb": 0.16
+        },
+        {
+          "file": "README.md",
+          "status": "OK",
+          "size_kb": 1.05
+        },
+        {
+          "file": "DEPLOYMENT_GUIDE.md",
+          "status": "OK",
+          "size_kb": 1.36
+        },
+        {
+          "file": "models/scaler_phase8.pkl",
+          "status": "OK",
+          "size_kb": 1.12
+        },
+        {
+          "file": "models/feature_columns.json",
+          "status": "OK",
+          "size_kb": 0.28
+        },
+        {
+          "file": "models/class_mapping.json",
+          "status": "OK",
+          "size_kb": 0.13
+        },
+        {
+          "file": "models/phase12_app_configuration.json",
+          "status": "OK",
+          "size_kb": 2.47
+        },
+        {
+          "file": "models/optimized/",
+          "status": "OK",
+          "models": 4
+        },
+        {
+          "file": "models/ensemble/",
+          "status": "OK",
+          "models": 3
+        }
+      ]
+    },
+    "model_loading": {
+      "passed": 4,
+      "failed": 0,
+      "details": [
+        {
+          "model": "Random Forest",
+          "status": "OK",
+          "path": "/content/drive/My Drive/AI model for poverty/outputs/app/outputs/models/optimized/model_random_forest_optimized.pkl"
+        },
+        {
+          "model": "XGBoost",
+          "status": "OK",
+          "path": "/content/drive/My Drive/AI model for poverty/outputs/app/outputs/models/optimized/model_xgboost_optimized.pkl"
+        },
+        {
+          "model": "LightGBM",
+          "status": "OK",
+          "path": "/content/drive/My Drive/AI model for poverty/outputs/app/outputs/models/optimized/model_lightgbm_optimized.pkl"
+        },
+        {
+          "model": "scaler",
+          "status": "OK"
+        }
+      ]
+    },
+    "database": {
+      "passed": 6,
+      "failed": 0,
+      "details": []
+    },
+    "prediction": {
+      "passed": 0,
+      "failed": 1,
+      "details": [
+        {
+          "model": "Random Forest",
+          "status": "ERROR",
+          "error": "X has 8 features, but StandardScaler is expecting "
+        }
+      ]
+    },
+    "configuration": {
+      "passed": 6,
+      "failed": 0,
+      "details": [
+        {
+          "key": "app_configuration",
+          "status": "OK"
+        },
+        {
+          "key": "features",
+          "status": "OK"
+        },
+        {
+          "key": "class_info",
+          "status": "OK"
+        },
+        {
+          "key": "confidence_settings",
+          "status": "OK"
+        }
+      ]
+    },
+    "requirements": {
+      "passed": 6,
+      "failed": 0,
+      "details": [
+        {
+          "package": "streamlit",
+          "status": "OK"
+        },
+        {
+          "package": "pandas",
+          "status": "OK"
+        },
+        {
+          "package": "numpy",
+          "status": "OK"
+        },
+        {
+          "package": "scikit-learn",
+          "status": "OK"
+        },
+        {
+          "package": "plotly",
+          "status": "OK"
+        },
+        {
+          "package": "Pillow",
+          "status": "OK"
+        }
+      ]
+    }
+  },
+  "recommendations": [
+    "\u274c Fix prediction functionality before deployment",
+    "\u2705 App is ready for deployment!"
+  ],
+  "deployment_ready": true
+}

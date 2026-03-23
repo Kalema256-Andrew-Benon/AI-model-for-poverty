@@ -1,0 +1,52 @@
+
+=================================================================
+UGANDA POVERTY CLASSIFICATION SYSTEM - QUICK START GUIDE
+=================================================================
+Generated: 2026-03-23 11:42:43
+=================================================================
+
+FOR USERS:
+----------
+1. Visit the app URL (provided by administrator)
+2. Create account or login with provided credentials
+3. Complete registration (wait for admin approval if required)
+4. Navigate to "New Prediction"
+5. Enter household information (8 features)
+6. Click "Predict Poverty Class"
+7. View results, confidence, and recommendations
+8. Download report (JSON/CSV) or email results
+
+FOR ADMINISTRATORS:
+-------------------
+1. Login with admin credentials
+2. Navigate to "Users" to manage user accounts
+3. Navigate to "Stats" to view app analytics
+4. Approve/reject new user registrations
+5. Monitor prediction activity
+6. Export usage reports
+
+FOR NGOs/GOVERNMENT:
+--------------------
+1. Login with NGO/Government account
+2. Navigate to "Bulk Upload"
+3. Download CSV template
+4. Fill in household data (multiple rows)
+5. Upload CSV file
+6. View bulk prediction results
+7. Download results for all households
+8. Use data for targeting interventions
+
+TEST CREDENTIALS:
+-----------------
+Admin: admin1 / 1234
+User: user1 / 1234
+
+⚠️ Change these passwords in production!
+
+SUPPORT:
+--------
+- Email: support@povertyapp.ug
+- Documentation: See README.md
+- Issues: Report via app or GitHub
+
+=================================================================
