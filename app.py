@@ -1,9 +1,10 @@
-# ============================================================================
+ # ============================================================================
 # UGANDA POVERTY CLASSIFICATION SYSTEM - PROFESSIONAL EDITION
 # ============================================================================
-# Version: 2.0 Professional
+# Version: 2.0 Professional - Google Drive Model Loading
 # Users: Individuals, NGOs, Government Agencies
 # Features: Authentication, Admin Dashboard, CSV Bulk Upload, History, Reports
+# Models: Loaded from Google Drive (direct download links)
 # ============================================================================
 
 import pandas as pd
@@ -18,9 +19,11 @@ import json
 import joblib
 import hashlib
 import sqlite3
+import requests
+import io
 from datetime import datetime, timedelta
 from PIL import Image
-import io
+from functools import lru_cache
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -29,6 +32,7 @@ warnings.filterwarnings('ignore')
 # ============================================================================
 
 def init_database():
+    """Initialize SQLite database for user management and prediction history"""
     conn = sqlite3.connect('poverty_app.db')
     cursor = conn.cursor()
     
@@ -77,9 +81,11 @@ def init_database():
     conn.close()
 
 def hash_password(password):
+    """Hash password using SHA-256"""
     return hashlib.sha256(password.encode()).hexdigest()
 
 def create_default_users():
+    """Create default admin and user accounts for testing"""
     conn = sqlite3.connect('poverty_app.db')
     cursor = conn.cursor()
     
@@ -102,6 +108,7 @@ def create_default_users():
     conn.close()
 
 def authenticate_user(username, password):
+    """Authenticate user and return user data"""
     conn = sqlite3.connect('poverty_app.db')
     cursor = conn.cursor()
     
@@ -123,6 +130,7 @@ def authenticate_user(username, password):
     return None
 
 def register_user(username, email, password, user_type='user', profile_pic=None):
+    """Register new user"""
     conn = sqlite3.connect('poverty_app.db')
     cursor = conn.cursor()
     
@@ -141,6 +149,7 @@ def register_user(username, email, password, user_type='user', profile_pic=None)
     return success, message
 
 def save_prediction(user_id, model_used, predicted_class, confidence, input_data, recommendations):
+    """Save prediction to history"""
     conn = sqlite3.connect('poverty_app.db')
     cursor = conn.cursor()
     cursor.execute("""
@@ -151,6 +160,7 @@ def save_prediction(user_id, model_used, predicted_class, confidence, input_data
     conn.close()
 
 def get_user_predictions(user_id, limit=50):
+    """Get user's prediction history"""
     conn = sqlite3.connect('poverty_app.db')
     cursor = conn.cursor()
     cursor.execute("""
@@ -165,6 +175,7 @@ def get_user_predictions(user_id, limit=50):
     } for p in predictions]
 
 def get_all_users():
+    """Get all users (Admin only)"""
     conn = sqlite3.connect('poverty_app.db')
     cursor = conn.cursor()
     cursor.execute("""
@@ -179,6 +190,7 @@ def get_all_users():
     } for u in users]
 
 def get_app_statistics():
+    """Get app-wide statistics (Admin only)"""
     conn = sqlite3.connect('poverty_app.db')
     cursor = conn.cursor()
     stats = {}
@@ -192,10 +204,11 @@ def get_app_statistics():
     return stats
 
 # ============================================================================
-# 2. LOAD ML MODELS & CONFIGURATION
+# 2. LOAD ML MODELS & CONFIGURATION (GOOGLE DRIVE INTEGRATION)
 # ============================================================================
 
 def load_app_configuration():
+    """Load app configuration from local or fallback defaults"""
     config_paths = [
         'outputs/models/phase12_app_configuration.json',
         'models/phase12_app_configuration.json',
@@ -207,10 +220,11 @@ def load_app_configuration():
             with open(config_path, 'r') as f:
                 return json.load(f)
     
+    # Default configuration
     return {
         'app_configuration': {
             'default_model': 'Random Forest',
-            'available_models': ['Random Forest', 'XGBoost', 'LightGBM'],
+            'available_models': ['Random Forest', 'XGBoost', 'LightGBM', 'Logistic Regression', 'Soft Voting', 'Hard Voting', 'Stacking'],
             'model_directory': 'models/optimized',
             'scaler_file': 'scaler_phase8.pkl',
             'feature_file': 'feature_columns.json',
@@ -236,30 +250,84 @@ def load_app_configuration():
         }
     }
 
+@lru_cache(maxsize=10)
+def download_model_from_drive(url, model_name):
+    """Download and cache model from Google Drive"""
+    try:
+        response = requests.get(url, timeout=60)
+        if response.status_code == 200:
+            model = joblib.load(io.BytesIO(response.content))
+            return model
+        return None
+    except Exception as e:
+        print(f"Error downloading {model_name}: {e}")
+        return None
+
 def load_ml_models():
+    """Load all trained ML models from Google Drive or local fallback"""
     config = load_app_configuration()
     loaded_models = {}
     scaler = None
     
-    model_dirs = ['outputs/models/optimized', 'outputs/models/ensemble', 'models/optimized', 'models/ensemble']
+    # Google Drive direct download links for models
+    GOOGLE_DRIVE_MODELS = {
+        # Ensemble models
+        'Soft Voting': 'https://drive.google.com/uc?export=download&id=1Zu9YYNQ7bHgm4-ChNFOe9GxaaJQWm7P8',
+        'Hard Voting': 'https://drive.google.com/uc?export=download&id=1pz0cTnynZfN9DotOgw6erl7hrfZmFaP8',
+        'Stacking': 'https://drive.google.com/uc?export=download&id=1qiCJ9H3XZR8_iUOnuW-vpRifzgPEPc66',
+        # Optimized models
+        'Random Forest': 'https://drive.google.com/uc?export=download&id=1fccrB6be7qqEePVd3VR2R_rizFDya4I6',
+        'XGBoost': 'https://drive.google.com/uc?export=download&id=18_h585c02eC0-PdhmMp6pwgtqQuw-XsQ',
+        'LightGBM': 'https://drive.google.com/uc?export=download&id=1z2txZkp3J7ToeO7mVAWrDuGJu_2SPhPT',
+        'Logistic Regression': 'https://drive.google.com/uc?export=download&id=1j3U7nKGnWrTfU_ij5tsoXNepf6gntfac'
+    }
     
-    for model_dir in model_dirs:
-        scaler_path = os.path.join(model_dir, config['app_configuration'].get('scaler_file', 'scaler_phase8.pkl'))
+    # Try to load scaler from local first
+    scaler_paths = [
+        'outputs/models/scaler_phase8.pkl',
+        'models/scaler_phase8.pkl',
+        'scaler_phase8.pkl'
+    ]
+    
+    for scaler_path in scaler_paths:
         if os.path.exists(scaler_path):
-            scaler = joblib.load(scaler_path)
-            break
+            try:
+                scaler = joblib.load(scaler_path)
+                break
+            except:
+                continue
     
-    available_models = config['app_configuration'].get('available_models', [])
+    # Load models: try Google Drive first, then local fallback
+    available_models = config.get('app_configuration', {}).get('available_models', [])
     
     for model_name in available_models:
-        model_filename = f"model_{model_name.lower().replace(' ', '_')}"
+        # Try Google Drive first
+        drive_url = GOOGLE_DRIVE_MODELS.get(model_name)
+        if drive_url:
+            model = download_model_from_drive(drive_url, model_name)
+            if model is not None:
+                loaded_models[model_name] = model
+                continue
         
-        for model_dir in model_dirs:
-            for ext in ['.pkl', '_optimized.pkl']:
-                model_path = os.path.join(model_dir, f"{model_filename}{ext}")
-                if os.path.exists(model_path):
+        # Fallback to local paths
+        model_filename = f"model_{model_name.lower().replace(' ', '_')}"
+        local_paths = [
+            f'outputs/models/optimized/{model_filename}.pkl',
+            f'outputs/models/optimized/{model_filename}_optimized.pkl',
+            f'outputs/models/ensemble/{model_filename}.pkl',
+            f'outputs/models/ensemble/{model_filename}_optimized.pkl',
+            f'models/optimized/{model_filename}.pkl',
+            f'models/ensemble/{model_filename}.pkl',
+            f'{model_filename}.pkl',
+        ]
+        
+        for model_path in local_paths:
+            if os.path.exists(model_path):
+                try:
                     loaded_models[model_name] = joblib.load(model_path)
                     break
+                except:
+                    continue
     
     return loaded_models, scaler, config
 
@@ -268,6 +336,7 @@ def load_ml_models():
 # ============================================================================
 
 def predict_single(user_inputs, model, scaler, feature_names, class_mapping):
+    """Make single prediction"""
     if scaler is None or model is None:
         return {'error': 'Model or scaler not available'}
     
@@ -293,6 +362,7 @@ def predict_single(user_inputs, model, scaler, feature_names, class_mapping):
         return {'error': f'Prediction failed: {str(e)}'}
 
 def predict_csv(csv_file, model, scaler, feature_names, class_mapping):
+    """Make bulk predictions from CSV file"""
     try:
         df = pd.read_csv(csv_file)
         required_cols = set(feature_names)
@@ -326,6 +396,7 @@ def predict_csv(csv_file, model, scaler, feature_names, class_mapping):
         return {'error': f'CSV prediction failed: {str(e)}'}
 
 def get_recommendations(class_label):
+    """Get personalized recommendations based on predicted class"""
     recommendations = {
         'poor': [
             'Apply for government cash transfer programs (PDM, SAGE)',
@@ -352,6 +423,7 @@ def get_recommendations(class_label):
     return recommendations.get(class_label.lower(), recommendations['middle class'])
 
 def create_downloadable_report(prediction_result, user_info):
+    """Create downloadable report"""
     report = {
         'report_type': 'Poverty Classification Report',
         'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -374,6 +446,7 @@ def create_downloadable_report(prediction_result, user_info):
     return json_report, csv_data.getvalue()
 
 def set_theme(theme):
+    """Set app theme (dark/light)"""
     if theme == 'dark':
         st.markdown("""
             <style>
@@ -387,6 +460,7 @@ def set_theme(theme):
 # ============================================================================
 
 def show_login_page():
+    """Display login page"""
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
@@ -424,6 +498,7 @@ def show_login_page():
             st.rerun()
 
 def show_registration_page():
+    """Display registration page"""
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
@@ -484,6 +559,7 @@ def show_registration_page():
             st.rerun()
 
 def show_user_profile():
+    """Display user profile in sidebar"""
     if st.session_state.get('logged_in', False):
         user = st.session_state.get('user_info', {})
         st.sidebar.markdown("---")
@@ -503,6 +579,7 @@ def show_user_profile():
         st.sidebar.markdown(f"Type: {user.get('user_type', 'user').title()}")
 
 def show_logout_button():
+    """Display logout button in sidebar"""
     if st.session_state.get('logged_in', False):
         st.sidebar.markdown("---")
         if st.sidebar.button("Logout", use_container_width=True):
@@ -516,6 +593,7 @@ def show_logout_button():
 # ============================================================================
 
 def show_dashboard_home():
+    """Display dashboard home page"""
     st.title("Dashboard")
     st.markdown("### Welcome to Uganda Poverty Classification System")
     
@@ -558,6 +636,7 @@ def show_dashboard_home():
             st.rerun()
 
 def show_single_prediction():
+    """Display single household prediction form"""
     st.title("New Prediction")
     st.markdown("### Enter Household Information")
     
@@ -604,15 +683,16 @@ def show_single_prediction():
                 display_prediction_results(results, selected_model)
 
 def display_prediction_results(results, model_name):
+    """Display prediction results"""
     st.markdown("---")
     st.subheader("Prediction Results")
     
     if results['class_label'].lower() == 'poor':
-        color, bg_color, border_color = "", "#ffebee", "#f44336"
+        bg_color, border_color = "#ffebee", "#f44336"
     elif results['class_label'].lower() == 'middle class':
-        color, bg_color, border_color = "", "#fff8e1", "#ffc107"
+        bg_color, border_color = "#fff8e1", "#ffc107"
     else:
-        color, bg_color, border_color = "", "#e8f5e9", "#4caf50"
+        bg_color, border_color = "#e8f5e9", "#4caf50"
     
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
@@ -646,6 +726,7 @@ def display_prediction_results(results, model_name):
         st.download_button(label="Download CSV", data=csv_data, file_name=f"poverty_prediction_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv", mime="text/csv", use_container_width=True)
 
 def show_bulk_upload():
+    """Display bulk CSV upload"""
     st.title("Bulk Upload (CSV)")
     
     user_type = st.session_state['user_info'].get('user_type', 'user')
@@ -687,6 +768,7 @@ def show_bulk_upload():
                         st.download_button(label="Download Results", data=results_df.to_csv(index=False), file_name=f"bulk_predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv", mime="text/csv", use_container_width=True)
 
 def show_prediction_history():
+    """Display prediction history"""
     st.title("Prediction History")
     predictions = get_user_predictions(st.session_state['user_info']['id'], limit=100)
     
@@ -703,6 +785,7 @@ def show_prediction_history():
         st.info("No prediction history yet.")
 
 def show_settings():
+    """Display settings"""
     st.title("Settings")
     user = st.session_state['user_info']
     
@@ -721,6 +804,7 @@ def show_settings():
     st.info("Theme will update after page refresh")
 
 def show_admin_users():
+    """Admin user management"""
     if st.session_state['user_info'].get('user_type') != 'admin':
         st.error("Admin privileges required.")
         return
@@ -730,6 +814,7 @@ def show_admin_users():
         st.dataframe(pd.DataFrame(users), use_container_width=True, hide_index=True)
 
 def show_admin_stats():
+    """Admin statistics"""
     if st.session_state['user_info'].get('user_type') != 'admin':
         st.error("Admin privileges required.")
         return
@@ -744,6 +829,7 @@ def show_admin_stats():
 # 6. MAIN APP INITIALIZATION
 # ============================================================================
 
+# Initialize session state
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 if 'user_info' not in st.session_state:
@@ -753,18 +839,22 @@ if 'current_page' not in st.session_state:
 if 'theme' not in st.session_state:
     st.session_state['theme'] = 'light'
 
+# Initialize database and load models
 init_database()
 create_default_users()
 loaded_models, scaler, app_config = load_ml_models()
 
+# Extract configuration
 FEATURE_NAMES = app_config.get('features', {}).get('feature_names', [])
 FEATURE_APP_NAMES = app_config.get('features', {}).get('feature_app_names', {})
 CLASS_MAPPING = app_config.get('class_info', {}).get('class_mapping', {})
 CONFIDENCE_CONFIG = app_config.get('confidence_settings', {})
 AVAILABLE_MODELS = app_config.get('app_configuration', {}).get('available_models', [])
 
+# Set theme
 set_theme(st.session_state['theme'])
 
+# Main app routing
 if not st.session_state.get('logged_in', False):
     if st.session_state.get('current_page') == 'register':
         show_registration_page()
@@ -774,6 +864,7 @@ else:
     show_user_profile()
     show_logout_button()
     
+    # Sidebar navigation
     st.sidebar.markdown("---")
     st.sidebar.subheader("Navigation")
     pages = {'Dashboard': 'dashboard', 'New Prediction': 'prediction', 'History': 'history', 'Bulk Upload': 'bulk_upload', 'Settings': 'settings'}
@@ -784,10 +875,12 @@ else:
     selected = st.sidebar.radio("Go to:", list(pages.keys()), index=0)
     st.session_state['current_page'] = pages[selected]
     
+    # Theme switcher
     st.sidebar.markdown("---")
     theme_choice = st.sidebar.radio("Theme", ['Light', 'Dark'])
     st.session_state['theme'] = 'dark' if theme_choice == 'Dark' else 'light'
     
+    # Page routing
     if st.session_state['current_page'] == 'dashboard':
         show_dashboard_home()
     elif st.session_state['current_page'] == 'prediction':
