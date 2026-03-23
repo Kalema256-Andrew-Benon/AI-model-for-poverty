@@ -1,0 +1,20 @@
+{
+  "features": [
+    "region",
+    "regurb",
+    "subreg",
+    "district",
+    "urban",
+    "equiv",
+    "hsize",
+    "nrrexp30",
+    "cpexp30"
+  ],
+  "n_features": 9,
+  "leakage_features_removed": [
+    "welfare",
+    "hpline",
+    "spline"
+  ],
+  "timestamp": "20260323_070929"
+}

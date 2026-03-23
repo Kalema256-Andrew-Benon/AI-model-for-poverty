@@ -1,0 +1,94 @@
+{
+  "timestamp": "20260323_100015",
+  "phase": 10,
+  "cell": 5,
+  "app_configuration": {
+    "default_model": "Random Forest",
+    "default_model_accuracy": 0.85,
+    "available_models": [
+      "Random Forest",
+      "XGBoost",
+      "LightGBM"
+    ],
+    "model_files": {
+      "Random Forest": "model_random_forest_optimized.pkl",
+      "XGBoost": "model_xgboost_optimized.pkl",
+      "LightGBM": "model_lightgbm_optimized.pkl"
+    },
+    "model_directory": "/content/drive/My Drive/AI model for poverty/outputs/models/optimized",
+    "scaler_file": "scaler_phase8.pkl",
+    "feature_file": "feature_columns.json",
+    "class_mapping_file": "class_mapping.json"
+  },
+  "features": {
+    "n_features": 8,
+    "feature_names": [
+      "region",
+      "regurb",
+      "subreg",
+      "district",
+      "urban",
+      "equiv",
+      "hsize",
+      "nrrexp30"
+    ],
+    "feature_app_names": {
+      "region": "Region",
+      "regurb": "Region-Urban Type",
+      "subreg": "Sub-Region",
+      "district": "District",
+      "urban": "Urban/Rural",
+      "equiv": "Monthly Income/Expenditure (UGX)",
+      "hsize": "Household Size",
+      "nrrexp30": "Non-Food Expenses (UGX)"
+    },
+    "top_3_features": {
+      "rank_1": {
+        "feature": "Non-Food Expenses (UGX)",
+        "importance": 1454.7982259083208,
+        "percentage": 48.19128758054031
+      },
+      "rank_2": {
+        "feature": "Monthly Income/Expenditure (UGX)",
+        "importance": 1299.6772813534467,
+        "percentage": 35.60318825850806
+      },
+      "rank_3": {
+        "feature": "District",
+        "importance": 400.4864696162114,
+        "percentage": 3.9243014080009617
+      }
+    }
+  },
+  "class_info": {
+    "n_classes": 3,
+    "class_labels": [
+      "poor",
+      "middle class",
+      "rich"
+    ],
+    "class_mapping": {
+      "0": "poor",
+      "1": "middle class",
+      "2": "rich"
+    }
+  },
+  "confidence_settings": {
+    "display_confidence": true,
+    "confidence_threshold": 0.7,
+    "show_uncertainty_warning": true,
+    "uncertainty_threshold": 0.3
+  },
+  "recommendations": {
+    "display_feature_importance": true,
+    "display_class_probabilities": true,
+    "allow_model_switching": true,
+    "show_model_performance": true
+  },
+  "all_models_performance": [],
+  "output_files": {
+    "models_directory": "/content/drive/My Drive/AI model for poverty/outputs/models",
+    "phase_10_directory": "/content/drive/My Drive/AI model for poverty/outputs/phase_10",
+    "dashboard": "phase10_final_dashboard_20260323_100015.png"
+  }
+}
