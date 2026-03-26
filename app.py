@@ -1,10 +1,10 @@
  # ============================================================================
 # UGANDA POVERTY CLASSIFICATION SYSTEM - PROFESSIONAL EDITION
 # ============================================================================
-# Version: 2.1 Optimized - Fast Loading & Google Drive Integration
+# Version: 2.2 - Ensemble Models Default + Google Drive Integration
 # Users: Individuals, NGOs, Government Agencies
 # Features: Authentication, Admin Dashboard, CSV Bulk Upload, History, Reports
-# Models: Cached loading from Google Drive with local fallback
+# Models: Ensemble models as default, loaded from Google Drive with caching
 # Performance: <0.5s response time after initial load
 # ============================================================================
 
@@ -238,11 +238,11 @@ def load_app_configuration():
             except:
                 continue
     
-    # Default configuration
+    # Default configuration with ENSEMBLE MODELS AS DEFAULT
     return {
         'app_configuration': {
-            'default_model': 'Random Forest',
-            'available_models': ['Random Forest', 'XGBoost', 'LightGBM', 'Logistic Regression', 'Soft Voting', 'Hard Voting', 'Stacking'],
+            'default_model': 'Stacking',  # Changed to ensemble model
+            'available_models': ['Stacking', 'Soft Voting', 'Hard Voting', 'Random Forest', 'XGBoost', 'LightGBM', 'Logistic Regression'],
             'model_directory': 'models/optimized',
             'scaler_file': 'scaler_phase8.pkl',
             'feature_file': 'feature_columns.json',
@@ -268,12 +268,12 @@ def load_app_configuration():
         }
     }
 
-# Google Drive direct download links
+# Google Drive direct download links for ALL models including ensemble
 GOOGLE_DRIVE_MODELS = {
-    # Ensemble models
+    # Ensemble models (DEFAULT)
+    'Stacking': 'https://drive.google.com/uc?export=download&id=1qiCJ9H3XZR8_iUOnuW-vpRifzgPEPc66',
     'Soft Voting': 'https://drive.google.com/uc?export=download&id=1Zu9YYNQ7bHgm4-ChNFOe9GxaaJQWm7P8',
     'Hard Voting': 'https://drive.google.com/uc?export=download&id=1pz0cTnynZfN9DotOgw6erl7hrfZmFaP8',
-    'Stacking': 'https://drive.google.com/uc?export=download&id=1qiCJ9H3XZR8_iUOnuW-vpRifzgPEPc66',
     # Optimized models
     'Random Forest': 'https://drive.google.com/uc?export=download&id=1fccrB6be7qqEePVd3VR2R_rizFDya4I6',
     'XGBoost': 'https://drive.google.com/uc?export=download&id=18_h585c02eC0-PdhmMp6pwgtqQuw-XsQ',
@@ -291,7 +291,7 @@ def load_model_from_drive_or_local(model_name, drive_url):
             if response.status_code == 200:
                 model = joblib.load(io.BytesIO(response.content))
                 return model
-        except:
+        except Exception as e:
             pass
     
     # Fallback to local paths
@@ -337,6 +337,7 @@ def load_all_models():
     """Load all models at once with caching for fast subsequent access"""
     config = load_app_configuration()
     loaded_models = {}
+    failed_models = []
     
     available_models = config.get('app_configuration', {}).get('available_models', [])
     
@@ -345,14 +346,16 @@ def load_all_models():
         model = load_model_from_drive_or_local(model_name, drive_url)
         if model is not None:
             loaded_models[model_name] = model
+        else:
+            failed_models.append(model_name)
     
-    return loaded_models
+    return loaded_models, failed_models
 
 def get_models_and_scaler():
     """Get cached models and scaler for prediction"""
-    loaded_models = load_all_models()
+    loaded_models, failed_models = load_all_models()
     scaler = load_scaler()
-    return loaded_models, scaler
+    return loaded_models, scaler, failed_models
 
 # ============================================================================
 # 3. PREDICTION FUNCTIONS (OPTIMIZED)
@@ -687,12 +690,39 @@ def show_single_prediction():
     st.title("🔮 New Prediction")
     st.markdown("### Enter Household Information")
     
-    # Model selection with loading indicator
-    selected_model = st.sidebar.selectbox("🤖 Model:", options=AVAILABLE_MODELS, index=0)
+    # Show model loading status in sidebar
+    st.sidebar.markdown("### 📊 Model Status")
     
-    # Show model loading status
-    if selected_model not in loaded_models:
-        st.sidebar.warning(f"⚠️ {selected_model} not loaded. Trying to download...")
+    # Check which models are loaded
+    loaded_count = len(loaded_models)
+    total_count = len(AVAILABLE_MODELS)
+    
+    st.sidebar.success(f"✅ {loaded_count}/{total_count} models loaded")
+    
+    if failed_models:
+        st.sidebar.warning(f"⚠️ {len(failed_models)} models failed to load")
+        for model in failed_models:
+            st.sidebar.error(f"❌ {model}")
+    
+    # Model selection - default to first ensemble model
+    default_index = 0
+    if 'Stacking' in AVAILABLE_MODELS:
+        default_index = AVAILABLE_MODELS.index('Stacking')
+    elif 'Soft Voting' in AVAILABLE_MODELS:
+        default_index = AVAILABLE_MODELS.index('Soft Voting')
+    
+    selected_model = st.sidebar.selectbox(
+        "🤖 Select Model:", 
+        options=AVAILABLE_MODELS, 
+        index=default_index,
+        help="Ensemble models (Stacking, Voting) are recommended for best accuracy"
+    )
+    
+    # Show model info
+    if selected_model in ['Stacking', 'Soft Voting', 'Hard Voting']:
+        st.sidebar.info("🏆 **Ensemble Model** - Combines multiple models for best accuracy")
+    else:
+        st.sidebar.info("📊 **Individual Model** - Single algorithm prediction")
     
     with st.form("prediction_form"):
         st.markdown("#### 🌍 Geographic Features")
@@ -725,6 +755,10 @@ def show_single_prediction():
         if model is None:
             st.error(f"❌ Model '{selected_model}' not available. Please try again or select a different model.")
             st.info("💡 Tip: Models are downloaded from Google Drive on first use. This may take 10-30 seconds.")
+            
+            # Show available models
+            if loaded_models:
+                st.success(f"✅ Available models: {', '.join(loaded_models.keys())}")
         else:
             with st.spinner(f"🤖 Running prediction with {selected_model}..."):
                 results = predict_single_fast(user_inputs=user_inputs, model=model, scaler=scaler, feature_names=FEATURE_NAMES, class_mapping=CLASS_MAPPING)
@@ -803,7 +837,12 @@ def show_bulk_upload():
     uploaded_file = st.file_uploader("📤 Upload Your CSV File", type=['csv'])
     
     if uploaded_file:
-        selected_model = st.selectbox("🤖 Select Model:", options=AVAILABLE_MODELS, index=0)
+        # Default to ensemble model
+        default_ensemble_index = 0
+        if 'Stacking' in AVAILABLE_MODELS:
+            default_ensemble_index = AVAILABLE_MODELS.index('Stacking')
+        
+        selected_model = st.selectbox("🤖 Select Model:", options=AVAILABLE_MODELS, index=default_ensemble_index)
         
         if st.button("🔮 Process CSV", type="primary", use_container_width=True):
             with st.spinner("🔄 Processing..."):
@@ -916,13 +955,15 @@ AVAILABLE_MODELS = app_config.get('app_configuration', {}).get('available_models
 # Load models and scaler with caching (only once per session)
 if not st.session_state['models_loaded']:
     with st.spinner("🔄 Loading models (first time may take 10-30 seconds)..."):
-        loaded_models, scaler = get_models_and_scaler()
+        loaded_models, scaler, failed_models = get_models_and_scaler()
         st.session_state['models_loaded'] = True
         st.session_state['loaded_models'] = loaded_models
         st.session_state['scaler'] = scaler
+        st.session_state['failed_models'] = failed_models
 else:
     loaded_models = st.session_state['loaded_models']
     scaler = st.session_state['scaler']
+    failed_models = st.session_state.get('failed_models', [])
 
 # Set theme
 if st.session_state['theme'] == 'dark':
